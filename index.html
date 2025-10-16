@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Online Voting System — Prototype</title>
+  <style>
+    :root{--accent:#0b67ff;--bg:#f7fbff;--card:#ffffff;--muted:#6b7280}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:var(--bg);color:#0f172a}
+    .container{max-width:980px;margin:36px auto;padding:20px}
+    header{display:flex;align-items:center;gap:16px}
+    .logo{width:56px;height:56px;background:linear-gradient(135deg,var(--accent),#00b4ff);border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+    h1{margin:0;font-size:1.6rem}
+    p.lead{margin:8px 0 0;color:var(--muted)}
+
+    .grid{display:grid;grid-template-columns:1fr 340px;gap:20px;margin-top:22px}
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+
+    /* ballot */
+    .ballot h2{margin:0 0 12px}
+    .candidate{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;border:1px solid #eef2ff;margin-bottom:10px}
+    .candidate .meta{display:flex;gap:12px;align-items:center}
+    .avatar{width:44px;height:44px;border-radius:10px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent)}
+    .btn{display:inline-block;padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:white;font-weight:600;cursor:pointer}
+    .btn.secondary{background:transparent;color:var(--accent);border:1px solid rgba(11,103,255,0.12)}
+
+    /* results */
+    .bar{height:18px;border-radius:999px;background:#eef2ff;overflow:hidden}
+    .bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#00b4ff);width:0%}
+    .small{font-size:0.9rem;color:var(--muted)}
+
+    footer{margin-top:18px;color:var(--muted);font-size:0.9rem}
+
+    /* responsive */
+    @media (max-width:880px){.grid{grid-template-columns:1fr;}.container{padding:12px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">OV</div>
+      <div>
+        <h1>Online Voting System</h1>
+        <p class="lead">Prototype demo — static front-end. Designed for demonstration and learning only.</p>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card ballot">
+        <h2>Cast your vote</h2>
+        <p class="small">Select one candidate and press <strong>Vote</strong>. This prototype stores votes locally in your browser (localStorage).</p>
+
+        <form id="voteForm">
+          <div id="candidates"></div>
+
+          <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+            <button class="btn" type="submit">Vote</button>
+            <button type="button" id="resetBtn" class="btn secondary">Reset votes (dev)</button>
+            <div style="margin-left:auto;color:var(--muted);font-size:0.9rem">Votes recorded: <span id="totalVotes">0</span></div>
+          </div>
+        </form>
+
+        <div id="message" style="margin-top:12px;color:green;font-weight:600"></div>
+      </section>
+
+      <aside class="card">
+        <h3>Live results</h3>
+        <div id="results" style="margin-top:12px"></div>
+        <hr style="margin:14px 0;opacity:0.06">
+        <h4 style="margin:0 0 8px">About this prototype</h4>
+        <p class="small">This is a static prototype intended to demonstrate UI and simple vote counting. It lacks real authentication, tamper-resistance, and audit logs — do NOT use for real elections.</p>
+        <footer>
+          To host: save as <code>index.html</code> and open in a browser or publish via GitHub Pages / Netlify.
+        </footer>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    // Sample candidate data
+    const candidatesData = [
+      { id: 'c1', name: 'Asha Patel', descr: 'Focus: Education & digital access' },
+      { id: 'c2', name: 'Rahul Singh', descr: 'Focus: Healthcare & jobs' },
+      { id: 'c3', name: 'Meera Iyer', descr: 'Focus: Environment & rural uplift' }
+    ];
+
+    // Utilities for storage
+    const STORAGE_KEY = 'ov_votes_v1';
+    function loadVotes(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return candidatesData.reduce((acc,c)=>{acc[c.id]=0;return acc},{})
+      try{return JSON.parse(raw)}catch(e){return candidatesData.reduce((acc,c)=>{acc[c.id]=0;return acc},{})}
+    }
+    function saveVotes(votes){localStorage.setItem(STORAGE_KEY,JSON.stringify(votes))}
+
+    // Render candidates
+    const candidatesEl = document.getElementById('candidates');
+    function renderCandidates(){
+      candidatesEl.innerHTML='';
+      candidatesData.forEach(c=>{
+        const wrapper = document.createElement('label');
+        wrapper.className='candidate';
+        wrapper.innerHTML = `
+          <div class="meta">
+            <div class="avatar">${c.name.split(' ').map(s=>s[0]).slice(0,2).join('')}</div>
+            <div>
+              <div style="font-weight:700">${c.name}</div>
+              <div class="small">${c.descr}</div>
+            </div>
+          </div>
+          <input type="radio" name="candidate" value="${c.id}" />
+        `;
+        candidatesEl.appendChild(wrapper);
+      })
+    }
+
+    // Render results
+    const resultsEl = document.getElementById('results');
+    function renderResults(){
+      const votes = loadVotes();
+      const total = Object.values(votes).reduce((a,b)=>a+b,0);
+      document.getElementById('totalVotes').textContent = total;
+      resultsEl.innerHTML='';
+      candidatesData.forEach(c=>{
+        const count = votes[c.id] || 0;
+        const pct = total===0?0:Math.round((count/total)*100);
+        const row = document.createElement('div');
+        row.style.marginBottom='12px';
+        row.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-weight:600">${c.name}</div>
+            <div class="small">${count} vote(s) — ${pct}%</div>
+          </div>
+          <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+        `;
+        resultsEl.appendChild(row);
+      })
+    }
+
+    // Handle voting
+    const form = document.getElementById('voteForm');
+    const messageEl = document.getElementById('message');
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      const formData = new FormData(form);
+      const chosen = formData.get('candidate');
+      if(!chosen){
+        messageEl.style.color='crimson';messageEl.textContent='Please select a candidate.';return;
+      }
+      // simple one-vote-per-browser restriction via localStorage flag
+      if(localStorage.getItem('ov_voted_flag')){
+        messageEl.style.color='crimson';messageEl.textContent='You have already voted from this browser.';return;
+      }
+      const votes = loadVotes();
+      votes[chosen] = (votes[chosen]||0)+1;
+      saveVotes(votes);
+      localStorage.setItem('ov_voted_flag','1');
+      messageEl.style.color='green';messageEl.textContent='Thank you — your vote has been recorded (locally).';
+      renderResults();
+    });
+
+    // Reset (dev)
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      if(!confirm('Reset all stored votes in this browser?')) return;
+      const empty = candidatesData.reduce((acc,c)=>{acc[c.id]=0;return acc},{})
+      saveVotes(empty);
+      localStorage.removeItem('ov_voted_flag');
+      renderResults();
+      messageEl.style.color='var(--muted)';messageEl.textContent='Votes reset.';
+    })
+
+    // init
+    renderCandidates();
+    // create default votes object if missing
+    if(!localStorage.getItem(STORAGE_KEY)){
+      const def = candidatesData.reduce((acc,c)=>{acc[c.id]=0;return acc},{})
+      saveVotes(def);
+    }
+    renderResults();
+  </script>
+</body>
+</html>
